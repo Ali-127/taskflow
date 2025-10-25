@@ -3,8 +3,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.generics import GenericAPIView
 
-from api.models import Project
-from .serializers import UserRegistrationSerializer, ProjectSerializer
+from api.models import Project, Task
+from .serializers import TaskSerializer, UserRegistrationSerializer, ProjectSerializer
 
 
 class RegisterUserView(GenericAPIView):
@@ -26,3 +26,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+class TaskViewSet(viewsets.ModelViewSet):
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Task.objects.all()
+    
