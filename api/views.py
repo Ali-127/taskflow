@@ -1,8 +1,10 @@
-from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework import status, viewsets
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.generics import GenericAPIView
-from .serializers import UserRegistrationSerializer
+
+from api.models import Project
+from .serializers import UserRegistrationSerializer, ProjectSerializer
 
 
 class RegisterUserView(GenericAPIView):
@@ -14,3 +16,13 @@ class RegisterUserView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status.HTTP_201_CREATED)
+    
+class ProjectViewSet(viewsets.ModelViewSet):
+    serializer_class = ProjectSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Project.objects.filter(created_by=self.request.user)
+    
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
