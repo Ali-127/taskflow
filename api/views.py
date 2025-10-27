@@ -1,10 +1,11 @@
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from rest_framework.generics import GenericAPIView
-
+from django_filters.rest_framework import DjangoFilterBackend
 from api.models import Project, Task
-from .serializers import TaskSerializer, UserRegistrationSerializer, ProjectSerializer
+from .serializers import ProjectListSerializer, TaskSerializer, UserRegistrationSerializer, ProjectSerializer
 
 
 class RegisterUserView(GenericAPIView):
@@ -18,20 +19,49 @@ class RegisterUserView(GenericAPIView):
         return Response(serializer.data, status.HTTP_201_CREATED)
     
 class ProjectViewSet(viewsets.ModelViewSet):
-    serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['name', 'description']
+    ordering_fields = ['created_at', 'name']
+    ordering = ['-created_at']
+
+    def get_serializer_class(self): # type: ignore
+        """Use different serializer for list and details"""
+        if self.action == 'list':
+            return ProjectListSerializer
+        return ProjectSerializer
+
+    def get_queryset(self): # type: ignore
+        """Users only see their own projects"""
         return Project.objects.filter(created_by=self.request.user)
     
     def perform_create(self, serializer):
+        """Auto set created_by to current user"""
         serializer.save(created_by=self.request.user)
 
 
 class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'priority', 'project', 'assigned_to']
+    search_fields = ['title', 'description']
+    ordering_fields = ['created_at', 'due_date', 'priority']
+    ordering = ['-created_at']  # newest first
     
-    def get_queryset(self):
-        return Task.objects.all()
+    
+    def get_queryset(self): # type: ignore
+        """Users only see tasks from their projects"""
+        user_project = Project.objects.filter(created_by=self.request.user)
+        return Task.objects.filter(project__in=user_project)
+    
+    def perform_create(self, serializer):
+        """Validate that task is being created in users project"""
+        project = serializer.validated_data.get('project')
+        if project.created_by != self.request.user:
+            raise serializer.ValidationError(
+                "you can only create tasks in your own projects."
+            )
+        serializer.save()
+        
     
