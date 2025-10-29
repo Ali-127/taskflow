@@ -54,14 +54,6 @@ class TaskViewSet(viewsets.ModelViewSet):
         """Users only see tasks from their projects"""
         user_project = Project.objects.filter(created_by=self.request.user)
         return Task.objects.filter(project__in=user_project)
-    
-    def perform_create(self, serializer):
-        """Validate that task is being created in users project"""
-        project = serializer.validated_data.get('project')
-        if project.created_by != self.request.user:
-            raise serializer.ValidationError(
-                "you can only create tasks in your own projects."
-            )
-        serializer.save()
+
         
     

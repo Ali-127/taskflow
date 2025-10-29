@@ -1,3 +1,4 @@
+from datetime import timezone
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from api.models import Project, Task
@@ -57,8 +58,30 @@ class TaskSerializer(serializers.ModelSerializer):
                   'created_at', 'updated_at',
                   ]
         read_only_fields = ['created_at', 'updated_at']
-
-
+        
+    def validate_title(self, value):
+        """Validate Task title"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Title cannot be empty.")
+        if len(value) < 3:
+            raise serializers.ValidationError("Title must be at least 3 characters.")
+        
+        return value.strip()
+    
+    def validate_due_date(self, value):
+        """Validate due date is not in the past."""
+        if value and value < timezone.now().date(): # type: ignore
+            raise serializers.ValidationError("Due date cannot be in the past.")
+        return value
+    
+    def validate_project(self, value):
+        """Validate user owns the project."""
+        request = self.context.get('request')
+        if request and value.created_by != request.user:
+            raise serializers.ValidationError('You can only create tasks in your own project.')
+        return value
+    
+    
 class ProjectSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     tasks = TaskSerializer(many=True, read_only=True)
@@ -87,6 +110,26 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_pending_tasks(self, obj):
         """Number of pending tasks"""
         return obj.tasks.exclude(status='done').count()
+    
+    def validate_title(self, value):
+        """Validate Project title"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Title cannot be empty.")
+        if len(value) < 3:
+            raise serializers.ValidationError("Title must be at least 3 characters.")
+        
+        request = self.context.get('request')
+        if request:
+            existing = Project.objects.filter(
+                created_by=request.user,
+                name__iexact=value.strip()
+            ).exclude(pk=self.instance.pk if self.instance else None)
+            
+            if existing.exists():
+                raise serializers.ValidationError("You already have a project with this title.")
+        
+        return value.strip()
+        
         
 # Lighter Project list serializer        
 class ProjectListSerializer(serializers.ModelSerializer):
