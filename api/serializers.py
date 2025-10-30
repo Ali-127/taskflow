@@ -149,7 +149,6 @@ class ProjectListSerializer(serializers.ModelSerializer):
         
     def get_task_count(self, obj):
         """Total numbers of tasks in project"""
-        project = Project.objects.get(id=1)
         return obj.tasks.count()
     
     def get_completed_tasks(self, obj):
