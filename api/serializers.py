@@ -123,7 +123,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             existing = Project.objects.filter(
                 created_by=request.user,
                 name__iexact=value.strip()
-            ).exclude(pk=self.instance.pk if self.instance else None)
+            ).exclude(pk=self.instance.pk if self.instance else None)  # if updating, exclude the object itself else no excluding
             
             if existing.exists():
                 raise serializers.ValidationError("You already have a project with this title.")

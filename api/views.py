@@ -33,7 +33,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self): # type: ignore
         """Users only see their own projects"""
-        return Project.objects.filter(created_by=self.request.user)
+        # query for getting projects owned by user
+        queryset = Project.objects.filter(created_by=self.request.user)
+        
+        # optimize queryset by loading user in same query
+        queryset = queryset.select_related('created_by')
+        
+        if self.action == 'retrive':
+            # for detail view also load tasks
+            queryset = queryset.prefetch_related('tasks__assigned_to')
+        
+        return queryset
     
     def perform_create(self, serializer):
         """Auto set created_by to current user"""
@@ -53,7 +63,13 @@ class TaskViewSet(viewsets.ModelViewSet):
     def get_queryset(self): # type: ignore
         """Users only see tasks from their projects"""
         user_project = Project.objects.filter(created_by=self.request.user)
-        return Task.objects.filter(project__in=user_project)
+        
+        return Task.objects.filter(
+            project__in=user_project
+            ).select_related(  # load project and assigned user in same query
+                'project',
+                'assigned_to'
+            )
 
         
     
